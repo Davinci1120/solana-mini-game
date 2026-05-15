@@ -1,0 +1,218 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+  <meta charset="UTF-8" />
+  <meta name="viewport" content="width=device-width, initial-scale=1.0"/>
+  <title>Solana Guess Game</title>
+
+  <style>
+    body {
+      margin: 0;
+      font-family: Arial, sans-serif;
+      background: #0f172a;
+      color: #e2e8f0;
+      display: flex;
+      justify-content: center;
+      align-items: center;
+      height: 100vh;
+    }
+
+    .card {
+      background: #111827;
+      padding: 30px;
+      border-radius: 16px;
+      width: 340px;
+      text-align: center;
+      box-shadow: 0 10px 30px rgba(0,0,0,0.4);
+    }
+
+    input, button {
+      width: 100%;
+      padding: 10px;
+      margin-top: 10px;
+      border-radius: 8px;
+      border: none;
+    }
+
+    button {
+      background: #3b82f6;
+      color: white;
+      cursor: pointer;
+    }
+
+    .result {
+      margin-top: 15px;
+      min-height: 20px;
+    }
+
+    .win { color: #22c55e; }
+    .lose { color: #ef4444; }
+  </style>
+</head>
+
+<body>
+
+  <div class="card" id="card">
+    <h1>🎮 Guess the Number</h1>
+
+    <div class="stats">
+  <span>Score: <b id="score">0</b></span>
+  <span>Streak: <b id="streak">0</b></span>
+  <span>Mult: x<b id="multiplier">1</b></span>
+</div>
+
+    <input id="guessInput" type="number" min="1" max="25" placeholder="Enter guess" />
+
+    <button id="playButton">Play</button>
+
+    <button id="shareButton">Share Result 🚀</button>
+
+    <div id="result" class="result"></div>
+  </div>
+<canvas id="shareCanvas" width="800" height="420" style="display:none;"></canvas>
+  <script>
+    console.log("🟢 GAME SCRIPT LOADED");
+  document.addEventListener("DOMContentLoaded", () => {
+
+  const button = document.getElementById("playButton");
+  const shareButton = document.getElementById("shareButton");
+console.log("shareButton:", shareButton);
+
+shareButton.addEventListener("click", () => {
+  console.log("🔥 SHARE CLICK WORKING");
+});
+  const result = document.getElementById("result");
+  const card = document.getElementById("card");
+
+  const scoreEl = document.getElementById("score");
+  const streakEl = document.getElementById("streak");
+  const multEl = document.getElementById("multiplier");
+
+  if (!button || !shareButton || !result || !card) {
+    console.error("Missing DOM elements");
+    return;
+  }
+
+  let score = Number(localStorage.getItem("score") || 0);
+  let streak = Number(localStorage.getItem("streak") || 0);
+
+  let multiplier = 1;
+  let totalPlays = 0;
+
+  let lastShareText = "";
+
+  scoreEl.textContent = score;
+  streakEl.textContent = streak;
+  multEl.textContent = multiplier;
+
+  function save() {
+    localStorage.setItem("score", score);
+    localStorage.setItem("streak", streak);
+  }
+
+  button.addEventListener("click", async () => {
+    totalPlays++;
+
+    const guess = Number(document.getElementById("guessInput").value);
+
+    const maxRange = Math.min(25 + Math.floor(totalPlays / 3), 60);
+
+    result.textContent = `Thinking... (1–${maxRange})`;
+    result.className = "result";
+
+    const res = await fetch("http://localhost:3000/play", {
+      method: "POST",
+      headers: { "Content-Type": "application/json" },
+      body: JSON.stringify({ guess })
+    });
+
+    const data = await res.json();
+
+    result.style.color = "";
+    card.style.boxShadow = "0 10px 30px rgba(0,0,0,0.4)";
+
+    if (data.win === true) {
+      multiplier += 1;
+      streak += 1;
+
+      const earned = 25 * multiplier;
+      score += earned;
+
+      result.textContent = `🎉 WIN! +${earned} tokens`;
+
+      result.classList.add("win");
+      card.style.boxShadow = "0 0 25px rgba(34,197,94,0.5)";
+
+      lastShareText = `I just won ${earned} tokens 🔥 Streak: ${streak}`;
+    } else {
+      multiplier = 1;
+      streak = 0;
+
+      const diff = Math.abs(guess - data.number);
+
+      if (diff <= 2) {
+        result.textContent = `😱 SO CLOSE! It was ${data.number}`;
+        result.style.color = "#f59e0b";
+      } else {
+        result.textContent = data.message;
+      }
+
+      result.classList.add("lose");
+
+      card.classList.add("shake");
+      setTimeout(() => card.classList.remove("shake"), 300);
+
+      lastShareText = `I missed... but I’m trying again 🎮`;
+    }
+
+    scoreEl.textContent = score;
+    streakEl.textContent = streak;
+    multEl.textContent = multiplier;
+
+    save();
+  });
+
+  shareButton.addEventListener("click", async () => {
+    const canvas = document.getElementById("shareCanvas");
+    const ctx = canvas.getContext("2d");
+
+    ctx.fillStyle = "#0f172a";
+    ctx.fillRect(0, 0, canvas.width, canvas.height);
+
+    ctx.fillStyle = "#111827";
+    ctx.fillRect(50, 50, 700, 320);
+
+    ctx.fillStyle = "#ffffff";
+    ctx.font = "bold 32px Arial";
+    ctx.fillText("🎮 Solana Guess Game", 90, 120);
+
+    ctx.font = "24px Arial";
+    ctx.fillText(`Score: ${score}`, 90, 190);
+    ctx.fillText(`Streak: ${streak}`, 90, 230);
+    ctx.fillText(`Multiplier: x${multiplier}`, 90, 270);
+
+    ctx.fillStyle = "#22c55e";
+    ctx.font = "20px Arial";
+    ctx.fillText(lastShareText, 90, 330);
+
+    const image = canvas.toDataURL("image/png");
+
+    const link = document.createElement("a");
+    link.href = image;
+    link.download = "solana-game-result.png";
+    link.click();
+
+    const tweetUrl = `https://twitter.com/intent/tweet?text=${encodeURIComponent(tweetText)}`;
+
+const popup = window.open(tweetUrl, "_blank");
+
+if (!popup) {
+  window.location.href = tweetUrl;
+};
+  });
+
+});
+</script>
+
+</body>
+</html>
